@@ -14,9 +14,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Acceptă request pe orice path (/, /api/check, etc.)
   if (req.method !== 'POST') {
-    res.writeHead(405);
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'DRPCIV Relay is running' }));
     return;
   }
 
@@ -25,8 +26,12 @@ const server = http.createServer(async (req, res) => {
   req.on('end', async () => {
     try {
       const { plateNumber, recaptchaToken } = JSON.parse(body);
+      console.log('Received request for plate:', plateNumber);
 
-      const postData = JSON.stringify({ plateNumber: plateNumber.toUpperCase(), recaptchaToken });
+      const postData = JSON.stringify({ 
+        plateNumber: plateNumber.toUpperCase(), 
+        recaptchaToken 
+      });
 
       const options = {
         hostname: 'dgpci.mai.gov.ro',
@@ -46,21 +51,28 @@ const server = http.createServer(async (req, res) => {
       const result = await new Promise((resolve, reject) => {
         const request = https.request(options, (response) => {
           let data = '';
+          console.log('DRPCIV response status:', response.statusCode);
           response.on('data', chunk => data += chunk);
           response.on('end', () => {
+            console.log('DRPCIV raw response:', data.substring(0, 200));
             try { resolve(JSON.parse(data)); }
-            catch (e) { resolve({ raw: data }); }
+            catch (e) { resolve({ raw: data.substring(0, 500) }); }
           });
         });
-        request.on('error', reject);
+        request.on('error', (err) => {
+          console.error('DRPCIV request error:', err.message);
+          reject(err);
+        });
         request.write(postData);
         request.end();
       });
 
+      console.log('Sending back to client:', JSON.stringify(result));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
 
     } catch (err) {
+      console.error('Relay error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
     }
@@ -68,5 +80,4 @@ const server = http.createServer(async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Relay running on port ${PORT}`));
-
+server.listen(PORT, () => console.log(`DRPCIV Relay running on port ${PORT}`));
