@@ -44,37 +44,18 @@ const server = http.createServer(async (req, res) => {
       const { plateNumber, recaptchaToken } = JSON.parse(body);
       console.log('Request for plate:', plateNumber);
 
-      // PASUL 1: GET pagina principală pentru a obține cookies de sesiune
-      console.log('Step 1: Getting session cookies...');
-      const pageRes = await httpsRequest({
-        hostname: 'dgpci.mai.gov.ro',
-        port: 443,
-        path: '/drpciv-forms/plate-number',
-        method: 'GET',
-        agent,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml',
-          'Accept-Language': 'ro-RO,ro;q=0.9',
-        }
-      });
-
-      // Extrage cookies din răspuns
-      const setCookieHeader = pageRes.headers['set-cookie'] || [];
-      const cookies = setCookieHeader.map(c => c.split(';')[0]).join('; ');
-      console.log('Session cookies:', cookies || 'none');
-
-      // PASUL 2: POST către API cu cookies de sesiune
-      console.log('Step 2: Posting to API...');
+      // Body-ul exact pe care îl trimite Angular
       const postData = JSON.stringify({ 
-        plateNumber: plateNumber.toUpperCase(), 
-        recaptchaToken 
+        plateNumber: plateNumber.toUpperCase(),
+        userEmail: '',
+        language: 'RO',
+        reCaptchaKey: recaptchaToken  // câmpul corect!
       });
 
       const apiRes = await httpsRequest({
         hostname: 'dgpci.mai.gov.ro',
         port: 443,
-        path: '/drpciv-forms/api/plate-status',
+        path: '/drpciv-forms-api/plate-status',  // URL-ul corect!
         method: 'POST',
         agent,
         headers: {
@@ -85,20 +66,17 @@ const server = http.createServer(async (req, res) => {
           'Accept': 'application/json, text/plain, */*',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
           'Accept-Language': 'ro-RO,ro;q=0.9',
-          'Cookie': cookies,
           'X-Requested-With': 'XMLHttpRequest',
         }
       }, postData);
 
-      console.log('DRPCIV API status:', apiRes.status);
-      console.log('DRPCIV API response preview:', apiRes.body.substring(0, 300));
+      console.log('DRPCIV status:', apiRes.status);
+      console.log('DRPCIV response:', apiRes.body.substring(0, 300));
 
       let result;
       try {
         result = JSON.parse(apiRes.body);
-        console.log('Parsed JSON:', JSON.stringify(result));
       } catch (e) {
-        console.log('Not JSON — HTML response received');
         result = { raw: apiRes.body.substring(0, 500), error: 'HTML_RESPONSE' };
       }
 
