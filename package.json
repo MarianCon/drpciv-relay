@@ -1,0 +1,8 @@
+{
+  "name": "drpciv-relay",
+  "version": "1.0.0",
+  "main": "api/check.js",
+  "scripts": {
+    "start": "node api/check.js"
+  }
+}
